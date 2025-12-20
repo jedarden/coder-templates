@@ -1,0 +1,31 @@
+name: Sync Templates to Coder
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Coder CLI
+        run: curl -fsSL https://coder.com/install.sh | sh
+
+      - name: Sync Templates
+        env:
+          CODER_URL: ${{ secrets.CODER_URL }}
+          CODER_SESSION_TOKEN: ${{ secrets.CODER_TOKEN }}
+        run: |
+          for dir in */; do
+            [ -f "$dir/main.tf" ] || continue
+            name="${dir%/}"
+            echo "Syncing: $name"
+            if coder templates versions list "$name" &>/dev/null; then
+              coder templates push "$name" -d "$dir" -y
+            else
+              coder templates create "$name" -d "$dir" -y
+            fi
+          done
