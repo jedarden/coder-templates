@@ -209,8 +209,7 @@ resource "kubernetes_pod" "main" {
       command           = ["sh", "-c", coder_agent.main.init_script]
 
       security_context {
-        run_as_user  = 1000
-        privileged   = true  # Required for Docker-in-Docker
+        run_as_user = 1000
       }
 
       env {
@@ -241,11 +240,6 @@ resource "kubernetes_pod" "main" {
         read_only  = true
       }
 
-      volume_mount {
-        mount_path = "/var/run/docker.sock"
-        name       = "docker-socket"
-        read_only  = false
-      }
     }
 
     volume {
@@ -261,14 +255,6 @@ resource "kubernetes_pod" "main" {
       config_map {
         name         = kubernetes_config_map.install_script.metadata[0].name
         default_mode = "0755"
-      }
-    }
-
-    volume {
-      name = "docker-socket"
-      host_path {
-        path = "/var/run/docker.sock"
-        type = "Socket"
       }
     }
 
