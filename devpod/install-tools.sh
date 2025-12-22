@@ -14,6 +14,32 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
+# Install and start Docker (Docker-in-Docker)
+echo "🐳 Setting up Docker..."
+if ! command_exists docker; then
+    curl -fsSL https://get.docker.com | sudo sh
+    sudo usermod -aG docker coder
+    echo "✅ Docker installed"
+else
+    echo "✅ Docker already installed"
+fi
+
+# Start Docker daemon if not running
+if ! pgrep -x "dockerd" > /dev/null; then
+    echo "🐳 Starting Docker daemon..."
+    sudo dockerd > /var/log/dockerd.log 2>&1 &
+    # Wait for Docker to be ready
+    for i in $(seq 1 30); do
+        if docker info >/dev/null 2>&1; then
+            echo "✅ Docker daemon started"
+            break
+        fi
+        sleep 1
+    done
+else
+    echo "✅ Docker daemon already running"
+fi
+
 # Install tmux if not present
 echo "📦 Checking tmux..."
 if ! command_exists tmux; then
@@ -145,6 +171,7 @@ echo "  🎉 Development Environment Ready!"
 echo "=========================================="
 echo ""
 echo "Installed tools:"
+echo "  - Docker (Docker-in-Docker)"
 echo "  - tmux (with resurrect & continuum)"
 echo "  - GitHub CLI (gh)"
 echo "  - Claude Code"

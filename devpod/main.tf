@@ -210,6 +210,7 @@ resource "kubernetes_pod" "main" {
 
       security_context {
         run_as_user = 1000
+        privileged  = true  # Required for Docker-in-Docker
       }
 
       env {
