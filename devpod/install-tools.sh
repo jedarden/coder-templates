@@ -14,31 +14,59 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
-# Install and start Docker (Docker-in-Docker)
-echo "🐳 Setting up Docker..."
-if ! command_exists docker; then
-    curl -fsSL https://get.docker.com | sudo sh
-    sudo usermod -aG docker coder
-    echo "✅ Docker installed"
+# Install and configure Podman
+echo "📦 Setting up Podman..."
+if ! command_exists podman; then
+    sudo apt-get update -qq
+    sudo apt-get install -y -qq podman fuse-overlayfs slirp4netns
+    echo "✅ Podman installed"
 else
-    echo "✅ Docker already installed"
+    echo "✅ Podman already installed"
 fi
 
-# Start Docker daemon if not running
-if ! pgrep -x "dockerd" > /dev/null; then
-    echo "🐳 Starting Docker daemon..."
-    sudo dockerd > /var/log/dockerd.log 2>&1 &
-    # Wait for Docker to be ready
-    for i in $(seq 1 30); do
-        if docker info >/dev/null 2>&1; then
-            echo "✅ Docker daemon started"
-            break
-        fi
-        sleep 1
-    done
-else
-    echo "✅ Docker daemon already running"
+# Configure Podman storage
+echo "🔧 Configuring Podman..."
+mkdir -p "$HOME/.config/containers"
+cat > "$HOME/.config/containers/storage.conf" << 'EOF'
+[storage]
+driver = "overlay"
+runroot = "/run/user/1000/containers"
+graphroot = "/var/lib/containers/storage"
+
+[storage.options]
+mount_program = "/usr/bin/fuse-overlayfs"
+
+[storage.options.overlay]
+mount_program = "/usr/bin/fuse-overlayfs"
+EOF
+
+# Configure registries
+cat > "$HOME/.config/containers/registries.conf" << 'EOF'
+[registries.search]
+registries = ['docker.io', 'quay.io', 'ghcr.io']
+
+[registries.insecure]
+registries = []
+EOF
+
+# Create containers policy
+cat > "$HOME/.config/containers/policy.json" << 'EOF'
+{
+    "default": [
+        {
+            "type": "insecureAcceptAnything"
+        }
+    ]
+}
+EOF
+
+# Set up Docker CLI compatibility (alias podman to docker)
+if ! grep -q "alias docker=podman" "$HOME/.bashrc" 2>/dev/null; then
+    echo 'alias docker=podman' >> "$HOME/.bashrc"
+    echo "✅ Docker alias configured (docker -> podman)"
 fi
+
+echo "✅ Podman configured"
 
 # Install tmux if not present
 echo "📦 Checking tmux..."
@@ -171,11 +199,14 @@ echo "  🎉 Development Environment Ready!"
 echo "=========================================="
 echo ""
 echo "Installed tools:"
-echo "  - Docker (Docker-in-Docker)"
+echo "  - Podman (container runtime)"
 echo "  - tmux (with resurrect & continuum)"
 echo "  - GitHub CLI (gh)"
 echo "  - Claude Code"
 echo "  - ccdash"
 echo "  - MANA"
 echo "  - code-server (VS Code)"
+echo ""
+echo "Container commands:"
+echo "  - podman (or 'docker' alias)"
 echo ""

@@ -210,7 +210,7 @@ resource "kubernetes_pod" "main" {
 
       security_context {
         run_as_user = 1000
-        privileged  = true  # Required for Docker-in-Docker
+        privileged  = true  # Required for Podman-in-container
       }
 
       env {
@@ -241,6 +241,11 @@ resource "kubernetes_pod" "main" {
         read_only  = true
       }
 
+      volume_mount {
+        mount_path = "/var/lib/containers"
+        name       = "podman-storage"
+        read_only  = false
+      }
     }
 
     volume {
@@ -257,6 +262,11 @@ resource "kubernetes_pod" "main" {
         name         = kubernetes_config_map.install_script.metadata[0].name
         default_mode = "0755"
       }
+    }
+
+    volume {
+      name = "podman-storage"
+      empty_dir {}
     }
 
     affinity {
