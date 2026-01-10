@@ -126,9 +126,9 @@ locals {
   # Workspace naming
   workspace_name = "coder-${data.coder_workspace_owner.me.name}-${data.coder_workspace.me.name}"
 
-  # Container image - use base image until ronaldraygun/coder-workspace is built
-  # TODO: switch to "ronaldraygun/coder-workspace:latest" once available
-  workspace_image = "codercom/enterprise-base:ubuntu"
+  # Container image from private Docker Hub (ronaldraygun)
+  # Requires docker-hub-registry imagePullSecret (reflected from kubernetes-reflector)
+  workspace_image = "ronaldraygun/coder-workspace:latest"
 
   # Labels for all resources
   labels = {
@@ -319,6 +319,11 @@ resource "kubernetes_deployment_v1" "main" {
       }
 
       spec {
+        # Pull from private Docker Hub using reflected secret
+        image_pull_secrets {
+          name = "docker-hub-registry"
+        }
+
         security_context {
           run_as_user = 1000
           fs_group    = 1000
