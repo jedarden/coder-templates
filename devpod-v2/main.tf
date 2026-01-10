@@ -346,6 +346,22 @@ resource "kubernetes_deployment_v1" "main" {
             value = coder_agent.main.token
           }
 
+          # Podman environment variables for Kubernetes
+          env {
+            name  = "CONTAINER_HOST"
+            value = "unix:///run/user/1000/podman/podman.sock"
+          }
+
+          env {
+            name  = "XDG_RUNTIME_DIR"
+            value = "/run/user/1000"
+          }
+
+          env {
+            name  = "BUILDAH_ISOLATION"
+            value = "chroot"
+          }
+
           resources {
             requests = {
               cpu    = "500m"
@@ -362,10 +378,16 @@ resource "kubernetes_deployment_v1" "main" {
             mount_path = "/home/coder"
           }
 
-          # For Podman storage
+          # For Podman storage (container images and layers)
           volume_mount {
             name       = "podman-storage"
             mount_path = "/home/coder/.local/share/containers"
+          }
+
+          # XDG_RUNTIME_DIR for Podman socket
+          volume_mount {
+            name       = "podman-run"
+            mount_path = "/run/user/1000"
           }
         }
 
@@ -379,6 +401,13 @@ resource "kubernetes_deployment_v1" "main" {
         volume {
           name = "podman-storage"
           empty_dir {}
+        }
+
+        volume {
+          name = "podman-run"
+          empty_dir {
+            medium = "Memory"
+          }
         }
 
         # Schedule on agent nodes
