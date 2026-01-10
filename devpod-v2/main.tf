@@ -159,6 +159,12 @@ resource "coder_agent" "main" {
     #!/bin/bash
     set -e
 
+    # Fix ownership of XDG_RUNTIME_DIR for Podman
+    if [ -d "/run/user/1000" ]; then
+      sudo chown -R coder:coder /run/user/1000 2>/dev/null || true
+    fi
+    mkdir -p /run/user/1000/containers
+
     # Configure git
     git config --global --add safe.directory '*'
     git config --global init.defaultBranch main
