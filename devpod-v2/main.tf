@@ -354,11 +354,6 @@ resource "kubernetes_deployment_v1" "main" {
 
           # Podman environment variables for Kubernetes
           env {
-            name  = "CONTAINER_HOST"
-            value = "unix:///run/user/1000/podman/podman.sock"
-          }
-
-          env {
             name  = "XDG_RUNTIME_DIR"
             value = "/run/user/1000"
           }
@@ -366,6 +361,12 @@ resource "kubernetes_deployment_v1" "main" {
           env {
             name  = "BUILDAH_ISOLATION"
             value = "chroot"
+          }
+
+          # Disable Podman socket mode - use direct execution
+          env {
+            name  = "CONTAINER_HOST"
+            value = ""
           }
 
           resources {
