@@ -190,12 +190,12 @@ resource "coder_agent" "main" {
       git clone --depth 1 https://github.com/tmux-plugins/tpm "$HOME/.tmux/plugins/tpm" 2>/dev/null || true
     fi
 
-    # Start code-server
+    # Start code-server (redirect output to close pipes properly)
     echo "Starting code-server..."
     if command -v code-server &> /dev/null; then
-      code-server --auth none --port 13337 --host 0.0.0.0 &
+      nohup code-server --auth none --port 13337 --host 0.0.0.0 > /tmp/code-server.log 2>&1 &
     else
-      /tmp/code-server/bin/code-server --auth none --port 13337 --host 0.0.0.0 &
+      nohup /tmp/code-server/bin/code-server --auth none --port 13337 --host 0.0.0.0 > /tmp/code-server.log 2>&1 &
     fi
 
     echo "Workspace ready!"
