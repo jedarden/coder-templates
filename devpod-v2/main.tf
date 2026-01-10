@@ -127,8 +127,7 @@ locals {
   workspace_name = "coder-${data.coder_workspace_owner.me.name}-${data.coder_workspace.me.name}"
 
   # Container image - built via GitHub Actions from containers/coder-workspace/
-  # Falls back to base image until custom image is built
-  workspace_image = "jedarden/coder-workspace:latest"
+  workspace_image = "ronaldraygun/coder-workspace:latest"
 
   # Labels for all resources
   labels = {
