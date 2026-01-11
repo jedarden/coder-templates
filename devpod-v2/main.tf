@@ -179,52 +179,134 @@ resource "coder_agent" "main" {
     fi
     mkdir -p /run/user/1000/containers
 
-    # Create workspace directory
+    # ===========================================
+    # Create and enter workspace directory
+    # ===========================================
     mkdir -p "$HOME/workspace"
+    cd "$HOME/workspace"
+    echo "Working in $(pwd)"
 
-    # Write start.sh to workspace (available for manual use)
+    # ===========================================
+    # Install development tools
+    # ===========================================
+
+    # Helper function
+    command_exists() { command -v "$1" >/dev/null 2>&1; }
+
+    # Git configuration
+    git config --global --add safe.directory '*'
+    git config --global init.defaultBranch main
+
+    # Node.js (required for Claude Code)
+    if ! command_exists node; then
+      echo "Installing Node.js..."
+      curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - >/dev/null 2>&1
+      sudo apt-get install -y -qq nodejs
+    fi
+
+    # Claude Code
+    if ! command_exists claude; then
+      echo "Installing Claude Code..."
+      sudo npm install -g @anthropic-ai/claude-code >/dev/null 2>&1
+    fi
+
+    # tmux
+    if ! command_exists tmux; then
+      echo "Installing tmux..."
+      sudo apt-get update -qq && sudo apt-get install -y -qq tmux
+    fi
+
+    # tmux plugins
+    if [ ! -d "$HOME/.tmux/plugins/tpm" ]; then
+      mkdir -p "$HOME/.tmux/plugins"
+      git clone --depth 1 https://github.com/tmux-plugins/tpm "$HOME/.tmux/plugins/tpm" 2>/dev/null || true
+      cat > "$HOME/.tmux.conf" << 'TMUXCONF'
+set -g history-limit 10000
+set -g mouse on
+set -g @plugin 'tmux-plugins/tpm'
+set -g @plugin 'tmux-plugins/tmux-resurrect'
+set -g @plugin 'tmux-plugins/tmux-continuum'
+set -g @continuum-restore 'on'
+run-shell '~/.tmux/plugins/tpm/tpm'
+TMUXCONF
+    fi
+
+    # MANA
+    if [ ! -f "$HOME/.mana/mana" ]; then
+      echo "Installing MANA..."
+      mkdir -p "$HOME/.mana"
+      curl -fsSL "https://github.com/jedarden/MANA/releases/latest/download/mana-linux-amd64" -o "$HOME/.mana/mana" 2>/dev/null || \
+        curl -fsSL "https://github.com/jedarden/MANA/releases/latest/download/mana" -o "$HOME/.mana/mana" 2>/dev/null || true
+      chmod +x "$HOME/.mana/mana" 2>/dev/null || true
+      grep -q '.mana' "$HOME/.bashrc" || echo 'export PATH="$HOME/.mana:$PATH"' >> "$HOME/.bashrc"
+    fi
+
+    # ccdash
+    if ! command_exists ccdash; then
+      echo "Installing ccdash..."
+      curl -fsSL "https://github.com/jedarden/ccdash/releases/latest/download/ccdash-linux-amd64" -o /tmp/ccdash 2>/dev/null
+      chmod +x /tmp/ccdash && sudo mv /tmp/ccdash /usr/local/bin/ccdash
+    fi
+
+    # GitHub CLI
+    if ! command_exists gh; then
+      echo "Installing GitHub CLI..."
+      curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg 2>/dev/null
+      echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+      sudo apt-get update -qq && sudo apt-get install -y -qq gh
+    fi
+
+    # code-server
+    if ! command_exists code-server; then
+      echo "Installing code-server..."
+      curl -fsSL https://code-server.dev/install.sh | sh -s -- --method=standalone --prefix=/tmp/code-server >/dev/null 2>&1
+      export PATH="/tmp/code-server/bin:$PATH"
+    fi
+
+    # ===========================================
+    # Write start.sh (for manual re-runs)
+    # ===========================================
     cat > "$HOME/workspace/start.sh" << 'STARTSCRIPT'
 ${local.start_script}
 STARTSCRIPT
     chmod +x "$HOME/workspace/start.sh"
-    echo "Tool installer available at ~/workspace/start.sh"
 
-    # Clone repository if specified (into workspace subdirectory)
+    # ===========================================
+    # Clone repository if specified
+    # ===========================================
     if [ -n "${data.coder_parameter.git_repo.value}" ]; then
       REPO_NAME=$(basename "${data.coder_parameter.git_repo.value}" .git)
-      REPO_DIR="$HOME/workspace/$REPO_NAME"
-      if [ ! -d "$REPO_DIR/.git" ]; then
+      if [ ! -d "$REPO_NAME/.git" ]; then
         echo "Cloning repository..."
-        git clone "${data.coder_parameter.git_repo.value}" "$REPO_DIR" || true
+        git clone "${data.coder_parameter.git_repo.value}" "$REPO_NAME" || true
       fi
     fi
 
     # Apply dotfiles if specified
     if [ -n "${data.coder_parameter.dotfiles_repo.value}" ]; then
-      echo "Applying dotfiles..."
       coder dotfiles -y "${data.coder_parameter.dotfiles_repo.value}" || true
     fi
 
-    # Start code-server (redirect output to close pipes properly)
+    # ===========================================
+    # Start code-server
+    # ===========================================
     echo "Starting code-server..."
-    if command -v code-server &> /dev/null; then
+    if command_exists code-server; then
       nohup code-server --auth none --port 13337 --host 0.0.0.0 > /tmp/code-server.log 2>&1 &
     elif [ -x "/tmp/code-server/bin/code-server" ]; then
       nohup /tmp/code-server/bin/code-server --auth none --port 13337 --host 0.0.0.0 > /tmp/code-server.log 2>&1 &
     fi
 
-    # Install VS Code extensions for AI development (background)
+    # Install VS Code extensions (background)
     if [ "${data.coder_parameter.ai_extensions.value}" = "true" ]; then
-      echo "Installing AI coding extensions..."
       (
-        sleep 10  # Wait for code-server to start
+        sleep 10
         code-server --install-extension rooveterinaryinc.roo-cline 2>/dev/null || true
         code-server --install-extension github.copilot 2>/dev/null || true
         code-server --install-extension github.copilot-chat 2>/dev/null || true
         code-server --install-extension kilocode.kilo-code 2>/dev/null || true
         code-server --install-extension ms-python.python 2>/dev/null || true
         code-server --install-extension hashicorp.terraform 2>/dev/null || true
-        code-server --install-extension redhat.vscode-yaml 2>/dev/null || true
       ) > /dev/null 2>&1 &
     fi
 
