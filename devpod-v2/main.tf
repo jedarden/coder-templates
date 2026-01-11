@@ -266,6 +266,30 @@ TMUXCONF
       grep -q '.mana' "$HOME/.bashrc" || echo 'export PATH="$HOME/.mana:$PATH"' >> "$HOME/.bashrc"
     fi
 
+    # Initialize MANA and sync with shared memory repo
+    if [ -x "$HOME/.mana/mana" ]; then
+      # Initialize if not already done
+      if [ ! -f "$HOME/.mana/metadata.sqlite" ]; then
+        "$HOME/.mana/mana" init 2>/dev/null || true
+      fi
+
+      # Set up sync with claude-config repo (shared memories)
+      if [ ! -f "$HOME/.mana/sync.toml" ]; then
+        echo "Configuring MANA sync..."
+        "$HOME/.mana/mana" sync init --remote https://github.com/ardenone/claude-config.git --branch main 2>/dev/null || true
+      fi
+
+      # Pull latest patterns from shared repo
+      echo "Syncing MANA memories..."
+      "$HOME/.mana/mana" sync pull 2>/dev/null || true
+
+      # Set up periodic backup (every 30 min via cron)
+      (crontab -l 2>/dev/null | grep -v "mana sync push"; echo "*/30 * * * * $HOME/.mana/mana sync push >/dev/null 2>&1") | crontab - 2>/dev/null || true
+
+      # Start MANA daemon
+      "$HOME/.mana/mana" daemon start 2>/dev/null || true
+    fi
+
     # ccdash
     if ! command_exists ccdash; then
       echo "Installing ccdash..."
