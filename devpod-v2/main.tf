@@ -115,6 +115,17 @@ data "coder_parameter" "dotfiles_repo" {
   order        = 5
 }
 
+data "coder_parameter" "ai_extensions" {
+  name         = "ai_extensions"
+  display_name = "AI Coding Extensions"
+  description  = "Install AI-powered coding assistants in VS Code"
+  icon         = "/emojis/1f916.png"
+  type         = "bool"
+  default      = "true"
+  mutable      = true
+  order        = 6
+}
+
 # =============================================================================
 # Local Variables
 # =============================================================================
@@ -169,6 +180,12 @@ resource "coder_agent" "main" {
     git config --global --add safe.directory '*'
     git config --global init.defaultBranch main
 
+    # Setup MANA directory if not present
+    mkdir -p "$HOME/.mana"
+    if command -v mana &> /dev/null && [ ! -f "$HOME/.mana/mana" ]; then
+      ln -sf "$(which mana)" "$HOME/.mana/mana" 2>/dev/null || true
+    fi
+
     # Install code-server if not present
     if ! command -v code-server &> /dev/null; then
       echo "Installing code-server..."
@@ -196,12 +213,32 @@ resource "coder_agent" "main" {
       git clone --depth 1 https://github.com/tmux-plugins/tpm "$HOME/.tmux/plugins/tpm" 2>/dev/null || true
     fi
 
+    # Copy tmux config if not present
+    if [ ! -f "$HOME/.tmux.conf" ] && [ -f "/etc/skel/.tmux.conf" ]; then
+      cp /etc/skel/.tmux.conf "$HOME/.tmux.conf"
+    fi
+
     # Start code-server (redirect output to close pipes properly)
     echo "Starting code-server..."
     if command -v code-server &> /dev/null; then
       nohup code-server --auth none --port 13337 --host 0.0.0.0 > /tmp/code-server.log 2>&1 &
     else
       nohup /tmp/code-server/bin/code-server --auth none --port 13337 --host 0.0.0.0 > /tmp/code-server.log 2>&1 &
+    fi
+
+    # Install VS Code extensions for AI development (background)
+    if [ "${data.coder_parameter.ai_extensions.value}" = "true" ]; then
+      echo "Installing AI coding extensions..."
+      (
+        sleep 10  # Wait for code-server to start
+        code-server --install-extension rooveterinaryinc.roo-cline 2>/dev/null || true
+        code-server --install-extension github.copilot 2>/dev/null || true
+        code-server --install-extension github.copilot-chat 2>/dev/null || true
+        code-server --install-extension kilocode.kilo-code 2>/dev/null || true
+        code-server --install-extension ms-python.python 2>/dev/null || true
+        code-server --install-extension hashicorp.terraform 2>/dev/null || true
+        code-server --install-extension redhat.vscode-yaml 2>/dev/null || true
+      ) &
     fi
 
     echo "Workspace ready!"
@@ -265,6 +302,22 @@ resource "coder_app" "terminal" {
   display_name = "Terminal"
   icon         = "/icon/terminal.svg"
   command      = "/bin/bash"
+}
+
+resource "coder_app" "claude-code" {
+  agent_id     = coder_agent.main.id
+  slug         = "claude-code"
+  display_name = "Claude Code"
+  icon         = "/emojis/1f916.png"
+  command      = "claude"
+}
+
+resource "coder_app" "tmux" {
+  agent_id     = coder_agent.main.id
+  slug         = "tmux"
+  display_name = "tmux"
+  icon         = "/icon/terminal.svg"
+  command      = "tmux new-session -A -s main"
 }
 
 # =============================================================================
