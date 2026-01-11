@@ -145,7 +145,36 @@ locals {
   start_script = file("${path.module}/start.sh")
 
   # Tmux config (installed to ~/.tmux/tmux.conf)
-  tmux_config = file("${path.module}/.tmux/tmux.conf")
+  tmux_config = <<-TMUX
+# MANA Workspace tmux configuration
+
+# Scrollback buffer
+set -g history-limit 10000
+
+# Mouse mode
+set -g mouse on
+
+# Plugin manager (TPM)
+set -g @plugin 'tmux-plugins/tpm'
+
+# Session persistence plugins
+set -g @plugin 'tmux-plugins/tmux-resurrect'
+set -g @plugin 'tmux-plugins/tmux-continuum'
+
+# Continuum settings - auto-save and auto-restore
+set -g @continuum-restore 'on'
+set -g @continuum-save-interval '15'
+
+# Resurrect settings
+set -g @resurrect-capture-pane-contents 'on'
+set -g @resurrect-strategy-vim 'session'
+
+# Store resurrect data in workspace .tmux directory
+set -g @resurrect-dir '#{pane_current_path}/.tmux/resurrect'
+
+# Initialize TPM (keep at bottom of config)
+run-shell '#{pane_current_path}/.tmux/plugins/tpm/tpm'
+TMUX
 
   # Labels for all resources
   labels = {
