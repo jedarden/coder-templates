@@ -180,13 +180,6 @@ resource "coder_agent" "main" {
     mkdir -p /run/user/1000/containers
 
     # ===========================================
-    # Create and enter workspace directory
-    # ===========================================
-    mkdir -p "$HOME/workspace"
-    cd "$HOME/workspace"
-    echo "Working in $(pwd)"
-
-    # ===========================================
     # Install development tools
     # ===========================================
 
@@ -264,21 +257,21 @@ TMUXCONF
     fi
 
     # ===========================================
-    # Write start.sh (for manual re-runs)
+    # Write start.sh to home directory
     # ===========================================
-    cat > "$HOME/workspace/start.sh" << 'STARTSCRIPT'
+    cat > "$HOME/start.sh" << 'STARTSCRIPT'
 ${local.start_script}
 STARTSCRIPT
-    chmod +x "$HOME/workspace/start.sh"
+    chmod +x "$HOME/start.sh"
 
     # ===========================================
     # Clone repository if specified
     # ===========================================
     if [ -n "${data.coder_parameter.git_repo.value}" ]; then
       REPO_NAME=$(basename "${data.coder_parameter.git_repo.value}" .git)
-      if [ ! -d "$REPO_NAME/.git" ]; then
+      if [ ! -d "$HOME/$REPO_NAME/.git" ]; then
         echo "Cloning repository..."
-        git clone "${data.coder_parameter.git_repo.value}" "$REPO_NAME" || true
+        git clone "${data.coder_parameter.git_repo.value}" "$HOME/$REPO_NAME" || true
       fi
     fi
 
@@ -354,7 +347,7 @@ resource "coder_app" "code-server" {
   slug         = "code-server"
   display_name = "VS Code"
   icon         = "/icon/code.svg"
-  url          = "http://localhost:13337/?folder=/home/coder/workspace"
+  url          = "http://localhost:13337/?folder=/home/coder"
   subdomain    = true
   share        = "owner"
 
