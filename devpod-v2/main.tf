@@ -141,8 +141,11 @@ locals {
   # Requires docker-hub-registry imagePullSecret (reflected from kubernetes-reflector)
   workspace_image = "ronaldraygun/coder-workspace:latest"
 
-  # Start script content (installed to ~/workspace/start.sh)
+  # Start script content (installed to ~/start.sh)
   start_script = file("${path.module}/start.sh")
+
+  # Tmux config (installed to ~/.tmux/tmux.conf)
+  tmux_config = file("${path.module}/.tmux/tmux.conf")
 
   # Labels for all resources
   labels = {
@@ -257,12 +260,18 @@ TMUXCONF
     fi
 
     # ===========================================
-    # Write start.sh to home directory
+    # Write start.sh and tmux config to home directory
     # ===========================================
     cat > "$HOME/start.sh" << 'STARTSCRIPT'
 ${local.start_script}
 STARTSCRIPT
     chmod +x "$HOME/start.sh"
+
+    # Write tmux config
+    mkdir -p "$HOME/.tmux/plugins" "$HOME/.tmux/resurrect"
+    cat > "$HOME/.tmux/tmux.conf" << 'TMUXCONF'
+${local.tmux_config}
+TMUXCONF
 
     # ===========================================
     # Clone repository if specified
