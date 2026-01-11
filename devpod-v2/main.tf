@@ -238,7 +238,7 @@ resource "coder_agent" "main" {
         code-server --install-extension ms-python.python 2>/dev/null || true
         code-server --install-extension hashicorp.terraform 2>/dev/null || true
         code-server --install-extension redhat.vscode-yaml 2>/dev/null || true
-      ) &
+      ) > /dev/null 2>&1 &
     fi
 
     echo "Workspace ready!"
