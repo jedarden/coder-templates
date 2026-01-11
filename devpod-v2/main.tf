@@ -182,15 +182,12 @@ resource "coder_agent" "main" {
     # Create workspace directory
     mkdir -p "$HOME/workspace"
 
-    # Write start.sh to workspace (always update to latest version)
+    # Write start.sh to workspace (available for manual use)
     cat > "$HOME/workspace/start.sh" << 'STARTSCRIPT'
 ${local.start_script}
 STARTSCRIPT
     chmod +x "$HOME/workspace/start.sh"
-
-    # Run the start script to install tools
-    echo "Running workspace setup..."
-    bash "$HOME/workspace/start.sh"
+    echo "Tool installer available at ~/workspace/start.sh"
 
     # Clone repository if specified (into workspace subdirectory)
     if [ -n "${data.coder_parameter.git_repo.value}" ]; then
