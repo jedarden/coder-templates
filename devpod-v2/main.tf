@@ -141,6 +141,9 @@ locals {
   # Requires docker-hub-registry imagePullSecret (reflected from kubernetes-reflector)
   workspace_image = "ronaldraygun/coder-workspace:latest"
 
+  # Start script content (installed to ~/workspace/start.sh)
+  start_script = file("${path.module}/start.sh")
+
   # Labels for all resources
   labels = {
     "app.kubernetes.io/name"       = "coder-workspace"
@@ -176,26 +179,23 @@ resource "coder_agent" "main" {
     fi
     mkdir -p /run/user/1000/containers
 
-    # Configure git
-    git config --global --add safe.directory '*'
-    git config --global init.defaultBranch main
+    # Create workspace directory
+    mkdir -p "$HOME/workspace"
 
-    # Setup MANA directory if not present
-    mkdir -p "$HOME/.mana"
-    if command -v mana &> /dev/null && [ ! -f "$HOME/.mana/mana" ]; then
-      ln -sf "$(which mana)" "$HOME/.mana/mana" 2>/dev/null || true
-    fi
+    # Write start.sh to workspace (always update to latest version)
+    cat > "$HOME/workspace/start.sh" << 'STARTSCRIPT'
+${local.start_script}
+STARTSCRIPT
+    chmod +x "$HOME/workspace/start.sh"
 
-    # Install code-server if not present
-    if ! command -v code-server &> /dev/null; then
-      echo "Installing code-server..."
-      curl -fsSL https://code-server.dev/install.sh | sh -s -- --method=standalone --prefix=/tmp/code-server
-      export PATH="/tmp/code-server/bin:$PATH"
-    fi
+    # Run the start script to install tools
+    echo "Running workspace setup..."
+    bash "$HOME/workspace/start.sh"
 
-    # Clone repository if specified
+    # Clone repository if specified (into workspace subdirectory)
     if [ -n "${data.coder_parameter.git_repo.value}" ]; then
-      REPO_DIR="$HOME/workspace"
+      REPO_NAME=$(basename "${data.coder_parameter.git_repo.value}" .git)
+      REPO_DIR="$HOME/workspace/$REPO_NAME"
       if [ ! -d "$REPO_DIR/.git" ]; then
         echo "Cloning repository..."
         git clone "${data.coder_parameter.git_repo.value}" "$REPO_DIR" || true
@@ -208,21 +208,11 @@ resource "coder_agent" "main" {
       coder dotfiles -y "${data.coder_parameter.dotfiles_repo.value}" || true
     fi
 
-    # Install tmux plugin manager if not present
-    if [ ! -d "$HOME/.tmux/plugins/tpm" ]; then
-      git clone --depth 1 https://github.com/tmux-plugins/tpm "$HOME/.tmux/plugins/tpm" 2>/dev/null || true
-    fi
-
-    # Copy tmux config if not present
-    if [ ! -f "$HOME/.tmux.conf" ] && [ -f "/etc/skel/.tmux.conf" ]; then
-      cp /etc/skel/.tmux.conf "$HOME/.tmux.conf"
-    fi
-
     # Start code-server (redirect output to close pipes properly)
     echo "Starting code-server..."
     if command -v code-server &> /dev/null; then
       nohup code-server --auth none --port 13337 --host 0.0.0.0 > /tmp/code-server.log 2>&1 &
-    else
+    elif [ -x "/tmp/code-server/bin/code-server" ]; then
       nohup /tmp/code-server/bin/code-server --auth none --port 13337 --host 0.0.0.0 > /tmp/code-server.log 2>&1 &
     fi
 
