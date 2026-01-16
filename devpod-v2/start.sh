@@ -140,17 +140,61 @@ if ! command -v git &>/dev/null; then
     exit 1
 fi
 
-# Check if claude is installed
-if ! command -v claude &>/dev/null; then
-    echo "Error: claude is not installed. Please install Claude Code first."
-    exit 1
-fi
-
 # Check and install kubectl if needed
 if ! command -v kubectl &>/dev/null; then
     install_kubectl
     if ! command -v kubectl &>/dev/null; then
         echo "Warning: Failed to install kubectl. Continuing without it."
+    fi
+fi
+
+# Install/update Claude Code globally
+install_claude_code() {
+    echo "Installing/updating Claude Code..."
+
+    # Check if npm is available
+    if ! command -v npm &>/dev/null; then
+        echo "Error: npm is not installed. Please install Node.js and npm first."
+        return 1
+    fi
+
+    # Try global install (may need sudo on some systems)
+    if npm install -g @anthropic-ai/claude-code 2>/dev/null; then
+        return 0
+    fi
+
+    # If global install failed, try with sudo
+    echo "Global install failed, trying with sudo..."
+    if sudo -n npm install -g @anthropic-ai/claude-code 2>/dev/null; then
+        return 0
+    fi
+
+    # If sudo without password failed, try interactive sudo
+    if sudo npm install -g @anthropic-ai/claude-code; then
+        return 0
+    fi
+
+    # Last resort: install to user directory
+    echo "System-wide install failed, trying user install..."
+    mkdir -p "$HOME/.npm-global"
+    npm config set prefix "$HOME/.npm-global"
+    if npm install -g @anthropic-ai/claude-code; then
+        # Ensure user npm bin is in PATH for this session
+        export PATH="$HOME/.npm-global/bin:$PATH"
+        return 0
+    fi
+
+    return 1
+}
+
+install_claude_code
+if ! command -v claude &>/dev/null; then
+    # Check user npm bin directory as fallback
+    if [[ -x "$HOME/.npm-global/bin/claude" ]]; then
+        export PATH="$HOME/.npm-global/bin:$PATH"
+    else
+        echo "Error: Claude Code installation failed."
+        exit 1
     fi
 fi
 
