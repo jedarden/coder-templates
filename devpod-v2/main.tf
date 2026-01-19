@@ -445,7 +445,11 @@ resource "kubernetes_persistent_volume_claim_v1" "home" {
   }
 
   lifecycle {
-    ignore_changes = [metadata[0].annotations]
+    ignore_changes = [
+      metadata[0].annotations,
+      metadata[0].labels,
+      spec[0].resources[0].requests["storage"],
+    ]
   }
 }
 
