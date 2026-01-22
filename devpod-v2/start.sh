@@ -148,84 +148,32 @@ if ! command -v kubectl &>/dev/null; then
     fi
 fi
 
-# Check and update Claude Code if needed
-update_claude_code() {
-    # Check if npm is available
-    if ! command -v npm &>/dev/null; then
-        echo "Error: npm is not installed. Please install Node.js and npm first."
-        return 1
-    fi
-
-    local CURRENT_VERSION=""
-    local LATEST_VERSION=""
-
-    # Get current installed version
-    if command -v claude &>/dev/null; then
-        CURRENT_VERSION=$(claude --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "")
-    fi
-
-    # Get latest version from npm
-    LATEST_VERSION=$(npm show @anthropic-ai/claude-code version 2>/dev/null || echo "")
-
-    if [[ -z "$LATEST_VERSION" ]]; then
-        echo "Warning: Could not fetch latest Claude Code version from npm."
-        if [[ -n "$CURRENT_VERSION" ]]; then
-            echo "Continuing with installed version $CURRENT_VERSION"
-            return 0
-        fi
-        return 1
-    fi
-
-    # Compare versions - install/update if different or not installed
-    if [[ "$CURRENT_VERSION" != "$LATEST_VERSION" ]]; then
-        if [[ -z "$CURRENT_VERSION" ]]; then
-            echo "Installing Claude Code v$LATEST_VERSION..."
-        else
-            echo "Updating Claude Code from v$CURRENT_VERSION to v$LATEST_VERSION..."
-        fi
-
-        # Try global install (may need sudo on some systems)
-        if npm install -g @anthropic-ai/claude-code 2>/dev/null; then
-            return 0
-        fi
-
-        # If global install failed, try with sudo
-        echo "Global install failed, trying with sudo..."
-        if sudo -n npm install -g @anthropic-ai/claude-code 2>/dev/null; then
-            return 0
-        fi
-
-        # If sudo without password failed, try interactive sudo
-        if sudo npm install -g @anthropic-ai/claude-code; then
-            return 0
-        fi
-
-        # Last resort: install to user directory
-        echo "System-wide install failed, trying user install..."
-        mkdir -p "$HOME/.npm-global"
-        npm config set prefix "$HOME/.npm-global"
-        if npm install -g @anthropic-ai/claude-code; then
-            export PATH="$HOME/.npm-global/bin:$PATH"
-            return 0
-        fi
-
-        return 1
-    else
-        echo "Claude Code v$CURRENT_VERSION is up to date."
-        return 0
-    fi
+# Install Claude Code using native installer if not present
+# Native installer auto-updates, so we only need to install once
+install_claude_code() {
+    echo "Installing Claude Code using native installer..."
+    curl -fsSL https://claude.ai/install.sh | bash
 }
 
-update_claude_code
 if ! command -v claude &>/dev/null; then
-    # Check user npm bin directory as fallback
-    if [[ -x "$HOME/.npm-global/bin/claude" ]]; then
-        export PATH="$HOME/.npm-global/bin:$PATH"
-    else
+    install_claude_code
+    # Source shell profile to pick up new PATH
+    if [[ -f "$HOME/.bashrc" ]]; then
+        source "$HOME/.bashrc"
+    elif [[ -f "$HOME/.zshrc" ]]; then
+        source "$HOME/.zshrc"
+    fi
+    # Also check common install location directly
+    if [[ -x "$HOME/.claude/bin/claude" ]]; then
+        export PATH="$HOME/.claude/bin:$PATH"
+    fi
+    if ! command -v claude &>/dev/null; then
         echo "Error: Claude Code installation failed."
         exit 1
     fi
 fi
+
+echo "Claude Code $(claude --version 2>/dev/null | head -1 || echo 'installed')"
 
 # Ensure tmux config directory exists
 mkdir -p "$TMUX_DIR/plugins"
