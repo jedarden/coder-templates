@@ -126,6 +126,17 @@ data "coder_parameter" "ai_extensions" {
   order        = 6
 }
 
+data "coder_parameter" "unlimited_resources" {
+  name         = "unlimited_resources"
+  display_name = "Best Effort Resources"
+  description  = "Use best-effort scheduling (no CPU/memory limits). Disable to set explicit limits."
+  icon         = "/emojis/1f680.png"
+  type         = "bool"
+  default      = "true"
+  mutable      = true
+  order        = 7
+}
+
 # =============================================================================
 # Local Variables
 # =============================================================================
@@ -526,14 +537,17 @@ resource "kubernetes_deployment_v1" "main" {
             value = ""
           }
 
-          resources {
-            requests = {
-              cpu    = "500m"
-              memory = "1Gi"
-            }
-            limits = {
-              cpu    = "${data.coder_parameter.cpu.value}"
-              memory = "${data.coder_parameter.memory.value}Gi"
+          dynamic "resources" {
+            for_each = data.coder_parameter.unlimited_resources.value == "false" ? [1] : []
+            content {
+              requests = {
+                cpu    = "500m"
+                memory = "1Gi"
+              }
+              limits = {
+                cpu    = "${data.coder_parameter.cpu.value}"
+                memory = "${data.coder_parameter.memory.value}Gi"
+              }
             }
           }
 
