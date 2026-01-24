@@ -197,28 +197,79 @@ fi
 # Install or update Claude Code using native installer
 install_claude_code() {
     echo "Installing/updating Claude Code via native installer..."
-    curl -fsSL https://claude.ai/install.sh | sh
+    curl -fsSL https://claude.ai/install.sh | bash
+}
+
+# Get installed Claude Code version (returns empty string if not installed)
+get_installed_claude_version() {
+    if command -v claude &>/dev/null; then
+        claude --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1
+    fi
+}
+
+# Get latest available Claude Code version
+get_latest_claude_version() {
+    local CLAUDE_RELEASES_URL="https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases/latest"
+    curl -fsSL "$CLAUDE_RELEASES_URL" 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1
+}
+
+# Compare semantic versions: returns 0 if v1 < v2, 1 otherwise
+version_lt() {
+    local v1="$1" v2="$2"
+    # If versions are equal, return false (not less than)
+    [[ "$v1" == "$v2" ]] && return 1
+    # Sort versions and check if v1 comes first
+    local lowest
+    lowest=$(printf '%s\n%s' "$v1" "$v2" | sort -V | head -n1)
+    [[ "$v1" == "$lowest" ]]
 }
 
 # Check if Claude Code needs installation or update
-if ! command -v claude &>/dev/null; then
-    install_claude_code
-    # Source profile to get updated PATH
-    if [[ -f "$HOME/.bashrc" ]]; then
-        source "$HOME/.bashrc" 2>/dev/null || true
-    fi
-    if [[ -f "$HOME/.zshrc" ]]; then
-        source "$HOME/.zshrc" 2>/dev/null || true
-    fi
-    # Check common install locations
+check_and_update_claude() {
+    local installed_version latest_version
+
+    # Ensure PATH includes common install location
     if [[ -x "$HOME/.claude/local/bin/claude" ]]; then
         export PATH="$HOME/.claude/local/bin:$PATH"
     fi
-    if ! command -v claude &>/dev/null; then
-        echo "Error: Claude Code installation failed."
-        exit 1
+
+    installed_version=$(get_installed_claude_version)
+    latest_version=$(get_latest_claude_version)
+
+    if [[ -z "$installed_version" ]]; then
+        echo "Claude Code not found. Installing..."
+        install_claude_code
+        # Source profile to get updated PATH
+        if [[ -f "$HOME/.bashrc" ]]; then
+            source "$HOME/.bashrc" 2>/dev/null || true
+        fi
+        if [[ -f "$HOME/.zshrc" ]]; then
+            source "$HOME/.zshrc" 2>/dev/null || true
+        fi
+        # Check common install locations
+        if [[ -x "$HOME/.claude/local/bin/claude" ]]; then
+            export PATH="$HOME/.claude/local/bin:$PATH"
+        fi
+        if ! command -v claude &>/dev/null; then
+            echo "Error: Claude Code installation failed."
+            exit 1
+        fi
+        echo "Claude Code installed successfully: $(get_installed_claude_version)"
+    elif [[ -z "$latest_version" ]]; then
+        echo "Warning: Could not fetch latest Claude Code version. Skipping update check."
+        echo "Current version: $installed_version"
+    elif version_lt "$installed_version" "$latest_version"; then
+        echo "Claude Code update available: $installed_version -> $latest_version"
+        install_claude_code
+        local new_version
+        new_version=$(get_installed_claude_version)
+        echo "Claude Code updated: $installed_version -> $new_version"
+    else
+        echo "Claude Code is up to date: $installed_version"
     fi
-fi
+}
+
+check_and_update_claude
 
 # Ensure tmux config directory exists
 mkdir -p "$TMUX_DIR/plugins"
