@@ -32,13 +32,17 @@ data "coder_workspace_owner" "me" {}
 data "coder_parameter" "cpu" {
   name         = "cpu"
   display_name = "CPU Cores"
-  description  = "Number of CPU cores for the workspace"
+  description  = "Number of CPU cores for the workspace (only applies when Best Effort is disabled)"
   icon         = "/icon/memory.svg"
   type         = "number"
-  default      = "2"
+  default      = "0"
   mutable      = true
   order        = 1
 
+  option {
+    name  = "No Limit (Best Effort)"
+    value = "0"
+  }
   option {
     name  = "2 Cores"
     value = "2"
@@ -56,13 +60,17 @@ data "coder_parameter" "cpu" {
 data "coder_parameter" "memory" {
   name         = "memory"
   display_name = "Memory (GB)"
-  description  = "Amount of RAM in gigabytes"
+  description  = "Amount of RAM in gigabytes (only applies when Best Effort is disabled)"
   icon         = "/icon/memory.svg"
   type         = "number"
-  default      = "4"
+  default      = "0"
   mutable      = true
   order        = 2
 
+  option {
+    name  = "No Limit (Best Effort)"
+    value = "0"
+  }
   option {
     name  = "4 GB"
     value = "4"
@@ -83,7 +91,7 @@ data "coder_parameter" "disk_size" {
   description  = "Persistent storage for home directory"
   icon         = "/emojis/1f4be.png"
   type         = "number"
-  default      = "20"
+  default      = "40"
   mutable      = false
   order        = 3
 
@@ -541,10 +549,10 @@ resource "kubernetes_deployment_v1" "main" {
                 cpu    = "500m"
                 memory = "1Gi"
               }
-              limits = {
-                cpu    = "${data.coder_parameter.cpu.value}"
-                memory = "${data.coder_parameter.memory.value}Gi"
-              }
+              limits = merge(
+                data.coder_parameter.cpu.value != "0" ? { cpu = "${data.coder_parameter.cpu.value}" } : {},
+                data.coder_parameter.memory.value != "0" ? { memory = "${data.coder_parameter.memory.value}Gi" } : {}
+              )
             }
           }
 
