@@ -98,19 +98,65 @@ install_mana() {
     echo "Installing mana..."
     mkdir -p "$MANA_DIR"
 
+    # Detect OS and architecture
+    local OS ARCH ASSET_NAME
+    case "$(uname -s)" in
+        Linux) OS="linux" ;;
+        Darwin) OS="darwin" ;;
+        *) echo "Error: Unsupported OS $(uname -s)"; return 1 ;;
+    esac
+
+    case "$(uname -m)" in
+        x86_64) ARCH="x86_64" ;;
+        aarch64|arm64) ARCH="aarch64" ;;
+        *) echo "Error: Unsupported architecture $(uname -m)"; return 1 ;;
+    esac
+
+    ASSET_NAME="mana-${OS}-${ARCH}.tar.gz"
+    local TEMP_DIR
+    TEMP_DIR=$(mktemp -d)
+
     # Download latest release using gh if available, otherwise curl
     if command -v gh &>/dev/null; then
-        gh release download --repo "$MANA_REPO" -p "mana" -D "$MANA_DIR" --clobber
+        gh release download --repo "$MANA_REPO" -p "$ASSET_NAME" -D "$TEMP_DIR" --clobber
     else
         # Get latest release tag
         LATEST_TAG=$(curl -s "https://api.github.com/repos/$MANA_REPO/releases/latest" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
         if [[ -z "$LATEST_TAG" ]]; then
             echo "Error: Could not determine latest mana release."
+            rm -rf "$TEMP_DIR"
             return 1
         fi
-        curl -L -o "$MANA_BIN" "https://github.com/$MANA_REPO/releases/download/$LATEST_TAG/mana"
+        curl -L -o "$TEMP_DIR/$ASSET_NAME" "https://github.com/$MANA_REPO/releases/download/$LATEST_TAG/$ASSET_NAME"
     fi
 
+    # Extract the tarball
+    if [[ -f "$TEMP_DIR/$ASSET_NAME" ]]; then
+        tar -xzf "$TEMP_DIR/$ASSET_NAME" -C "$TEMP_DIR"
+        # Find and move the mana binary
+        if [[ -f "$TEMP_DIR/mana" ]]; then
+            mv "$TEMP_DIR/mana" "$MANA_BIN"
+        elif [[ -f "$TEMP_DIR/mana-${OS}-${ARCH}/mana" ]]; then
+            mv "$TEMP_DIR/mana-${OS}-${ARCH}/mana" "$MANA_BIN"
+        else
+            # Search for mana binary in extracted contents
+            local FOUND_BIN
+            FOUND_BIN=$(find "$TEMP_DIR" -name "mana" -type f -executable 2>/dev/null | head -1)
+            if [[ -n "$FOUND_BIN" ]]; then
+                mv "$FOUND_BIN" "$MANA_BIN"
+            else
+                echo "Error: Could not find mana binary in extracted archive."
+                rm -rf "$TEMP_DIR"
+                return 1
+            fi
+        fi
+    else
+        echo "Error: Failed to download $ASSET_NAME"
+        rm -rf "$TEMP_DIR"
+        return 1
+    fi
+
+    rm -rf "$TEMP_DIR"
     chmod +x "$MANA_BIN"
     echo "mana installed to $MANA_BIN"
 }
@@ -148,32 +194,31 @@ if ! command -v kubectl &>/dev/null; then
     fi
 fi
 
-# Install Claude Code using native installer if not present
-# Native installer auto-updates, so we only need to install once
+# Install or update Claude Code using native installer
 install_claude_code() {
-    echo "Installing Claude Code using native installer..."
-    curl -fsSL https://claude.ai/install.sh | bash
+    echo "Installing/updating Claude Code via native installer..."
+    curl -fsSL https://claude.ai/install.sh | sh
 }
 
+# Check if Claude Code needs installation or update
 if ! command -v claude &>/dev/null; then
     install_claude_code
-    # Source shell profile to pick up new PATH
+    # Source profile to get updated PATH
     if [[ -f "$HOME/.bashrc" ]]; then
-        source "$HOME/.bashrc"
-    elif [[ -f "$HOME/.zshrc" ]]; then
-        source "$HOME/.zshrc"
+        source "$HOME/.bashrc" 2>/dev/null || true
     fi
-    # Also check common install location directly
-    if [[ -x "$HOME/.claude/bin/claude" ]]; then
-        export PATH="$HOME/.claude/bin:$PATH"
+    if [[ -f "$HOME/.zshrc" ]]; then
+        source "$HOME/.zshrc" 2>/dev/null || true
+    fi
+    # Check common install locations
+    if [[ -x "$HOME/.claude/local/bin/claude" ]]; then
+        export PATH="$HOME/.claude/local/bin:$PATH"
     fi
     if ! command -v claude &>/dev/null; then
         echo "Error: Claude Code installation failed."
         exit 1
     fi
 fi
-
-echo "Claude Code $(claude --version 2>/dev/null | head -1 || echo 'installed')"
 
 # Ensure tmux config directory exists
 mkdir -p "$TMUX_DIR/plugins"
@@ -219,3 +264,4 @@ tmux send-keys -t "$SESSION_NAME" "claude --dangerously-skip-permissions" Enter
 # Attach to the session
 echo "Attaching to session: $SESSION_NAME"
 tmux -f "$TMUX_CONF" attach-session -t "$SESSION_NAME"
+
