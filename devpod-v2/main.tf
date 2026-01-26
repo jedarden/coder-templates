@@ -596,36 +596,17 @@ resource "kubernetes_deployment_v1" "main" {
           }
         }
 
-        # Schedule on agent nodes
-        affinity {
-          node_affinity {
-            required_during_scheduling_ignored_during_execution {
-              node_selector_term {
-                match_expressions {
-                  key      = "kubernetes.io/role"
-                  operator = "In"
-                  values   = ["agent"]
-                }
-              }
-            }
-          }
+        # Schedule exclusively on k3s-dell-micro
+        node_selector = {
+          "kubernetes.io/hostname" = "k3s-dell-micro"
+        }
 
-          # Spread workspaces across nodes
-          pod_anti_affinity {
-            preferred_during_scheduling_ignored_during_execution {
-              weight = 1
-              pod_affinity_term {
-                topology_key = "kubernetes.io/hostname"
-                label_selector {
-                  match_expressions {
-                    key      = "app.kubernetes.io/name"
-                    operator = "In"
-                    values   = ["coder-workspace"]
-                  }
-                }
-              }
-            }
-          }
+        # Tolerate the dedicated taint on k3s-dell-micro
+        toleration {
+          key      = "dedicated"
+          operator = "Equal"
+          value    = "coder-workspace"
+          effect   = "NoSchedule"
         }
       }
     }
