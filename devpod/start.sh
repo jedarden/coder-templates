@@ -194,6 +194,21 @@ if ! command -v kubectl &>/dev/null; then
     fi
 fi
 
+# Install Node.js if not present (required for npm-based tools)
+install_nodejs() {
+    echo "Installing Node.js..."
+    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - >/dev/null 2>&1
+    sudo apt-get install -y -qq nodejs
+}
+
+if ! command -v node &>/dev/null; then
+    install_nodejs
+    if ! command -v node &>/dev/null; then
+        echo "Error: Failed to install Node.js. Cannot continue."
+        exit 1
+    fi
+fi
+
 # Install or update Claude Code using native installer
 install_claude_code() {
     echo "Installing/updating Claude Code via native installer..."
