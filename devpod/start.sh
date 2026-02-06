@@ -194,6 +194,34 @@ if ! command -v kubectl &>/dev/null; then
     fi
 fi
 
+# Install Node.js (general development dependency)
+install_nodejs() {
+    echo "Installing Node.js..."
+    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - >/dev/null 2>&1
+    sudo apt-get install -y -qq nodejs
+}
+
+if ! command -v node &>/dev/null; then
+    install_nodejs
+    if ! command -v node &>/dev/null; then
+        echo "Warning: Failed to install Node.js. Continuing without it."
+    fi
+fi
+
+# Install Python 3 and pip (general development dependency)
+install_python() {
+    echo "Installing Python 3 and pip..."
+    sudo apt-get update -qq
+    sudo apt-get install -y -qq python3 python3-pip python3-venv
+}
+
+if ! command -v python3 &>/dev/null; then
+    install_python
+    if ! command -v python3 &>/dev/null; then
+        echo "Warning: Failed to install Python. Continuing without it."
+    fi
+fi
+
 # Install or update Claude Code using native installer (no Node.js required)
 install_claude_code() {
     echo "Installing/updating Claude Code via native installer..."
