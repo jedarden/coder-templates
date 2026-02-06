@@ -271,6 +271,57 @@ check_and_update_claude() {
 
 check_and_update_claude
 
+# Install code-server if not present
+install_code_server() {
+    echo "Installing code-server..."
+    curl -fsSL https://code-server.dev/install.sh | sh -s -- --method=standalone --prefix="$HOME/.local/code-server"
+    export PATH="$HOME/.local/code-server/bin:$PATH"
+}
+
+if ! command -v code-server &>/dev/null; then
+    install_code_server
+    if ! command -v code-server &>/dev/null; then
+        echo "Warning: Failed to install code-server. Continuing without it."
+    fi
+fi
+
+# Start code-server in background
+start_code_server() {
+    if command -v code-server &>/dev/null; then
+        if ! pgrep -f "code-server.*13337" >/dev/null; then
+            echo "Starting code-server on port 13337..."
+            nohup code-server --auth none --port 13337 --host 0.0.0.0 > /tmp/code-server.log 2>&1 &
+            echo "code-server started. Access at http://localhost:13337"
+        else
+            echo "code-server already running."
+        fi
+    fi
+}
+
+start_code_server
+
+# Install VS Code extensions in background
+install_vscode_extensions() {
+    echo "Installing VS Code extensions in background..."
+    (
+        sleep 10
+        code-server --install-extension rooveterinaryinc.roo-cline 2>/dev/null || true
+        code-server --install-extension github.copilot 2>/dev/null || true
+        code-server --install-extension github.copilot-chat 2>/dev/null || true
+        code-server --install-extension kilocode.kilo-code 2>/dev/null || true
+        code-server --install-extension ms-python.python 2>/dev/null || true
+        code-server --install-extension hashicorp.terraform 2>/dev/null || true
+        echo "VS Code extensions installed."
+    ) > /tmp/vscode-extensions.log 2>&1 &
+}
+
+# Ask user if they want AI extensions
+read -p "Install AI coding extensions for VS Code? (y/n) [y]: " -n 1 -r INSTALL_EXTENSIONS
+echo
+if [[ ! $INSTALL_EXTENSIONS =~ ^[Nn]$ ]]; then
+    install_vscode_extensions
+fi
+
 # Ensure tmux config directory exists
 mkdir -p "$TMUX_DIR/plugins"
 mkdir -p "$TMUX_DIR/resurrect"
@@ -284,6 +335,41 @@ if [[ ! -x "$MANA_BIN" ]]; then
     install_mana
     if [[ ! -x "$MANA_BIN" ]]; then
         echo "Warning: Failed to install mana. Continuing without it."
+    fi
+fi
+
+# Install GitHub CLI if not present
+install_gh() {
+    echo "Installing GitHub CLI..."
+    curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg 2>/dev/null
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+    sudo apt-get update -qq && sudo apt-get install -y -qq gh
+}
+
+if ! command -v gh &>/dev/null; then
+    install_gh
+    if ! command -v gh &>/dev/null; then
+        echo "Warning: Failed to install GitHub CLI. Continuing without it."
+    fi
+fi
+
+# Install ccdash if not present
+install_ccdash() {
+    echo "Installing ccdash..."
+    local ARCH
+    case "$(uname -m)" in
+        x86_64) ARCH="amd64" ;;
+        aarch64|arm64) ARCH="arm64" ;;
+        *) echo "Error: Unsupported architecture $(uname -m)"; return 1 ;;
+    esac
+    curl -fsSL "https://github.com/jedarden/ccdash/releases/latest/download/ccdash-linux-${ARCH}" -o /tmp/ccdash
+    chmod +x /tmp/ccdash && sudo mv /tmp/ccdash /usr/local/bin/ccdash
+}
+
+if ! command -v ccdash &>/dev/null; then
+    install_ccdash
+    if ! command -v ccdash &>/dev/null; then
+        echo "Warning: Failed to install ccdash. Continuing without it."
     fi
 fi
 
