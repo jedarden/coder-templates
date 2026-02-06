@@ -280,10 +280,10 @@ TMUXCONF
     echo ""
     echo "This will install:"
     echo "  - Claude Code (with version checking)"
+    echo "  - Node.js and Python"
     echo "  - tmux + plugins"
     echo "  - MANA"
-    echo "  - kubectl"
-    echo "  - code-server (VS Code)"
+    echo "  - kubectl, gh, ccdash"
     echo "=========================================="
     echo ""
   EOT
@@ -323,22 +323,6 @@ TMUXCONF
 # =============================================================================
 # Coder Apps
 # =============================================================================
-
-resource "coder_app" "code-server" {
-  agent_id     = coder_agent.main.id
-  slug         = "code-server"
-  display_name = "VS Code"
-  icon         = "/icon/code.svg"
-  url          = "http://localhost:13337/?folder=/home/coder"
-  subdomain    = false
-  share        = "owner"
-
-  healthcheck {
-    url       = "http://localhost:13337/healthz"
-    interval  = 5
-    threshold = 10
-  }
-}
 
 resource "coder_app" "terminal" {
   agent_id     = coder_agent.main.id

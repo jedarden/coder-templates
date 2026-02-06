@@ -299,57 +299,6 @@ check_and_update_claude() {
 
 check_and_update_claude
 
-# Install code-server if not present
-install_code_server() {
-    echo "Installing code-server..."
-    curl -fsSL https://code-server.dev/install.sh | sh -s -- --method=standalone --prefix="$HOME/.local/code-server"
-    export PATH="$HOME/.local/code-server/bin:$PATH"
-}
-
-if ! command -v code-server &>/dev/null; then
-    install_code_server
-    if ! command -v code-server &>/dev/null; then
-        echo "Warning: Failed to install code-server. Continuing without it."
-    fi
-fi
-
-# Start code-server in background
-start_code_server() {
-    if command -v code-server &>/dev/null; then
-        if ! pgrep -f "code-server.*13337" >/dev/null; then
-            echo "Starting code-server on port 13337..."
-            nohup code-server --auth none --port 13337 --host 0.0.0.0 > /tmp/code-server.log 2>&1 &
-            echo "code-server started. Access at http://localhost:13337"
-        else
-            echo "code-server already running."
-        fi
-    fi
-}
-
-start_code_server
-
-# Install VS Code extensions in background
-install_vscode_extensions() {
-    echo "Installing VS Code extensions in background..."
-    (
-        sleep 10
-        code-server --install-extension rooveterinaryinc.roo-cline 2>/dev/null || true
-        code-server --install-extension github.copilot 2>/dev/null || true
-        code-server --install-extension github.copilot-chat 2>/dev/null || true
-        code-server --install-extension kilocode.kilo-code 2>/dev/null || true
-        code-server --install-extension ms-python.python 2>/dev/null || true
-        code-server --install-extension hashicorp.terraform 2>/dev/null || true
-        echo "VS Code extensions installed."
-    ) > /tmp/vscode-extensions.log 2>&1 &
-}
-
-# Ask user if they want AI extensions
-read -p "Install AI coding extensions for VS Code? (y/n) [y]: " -n 1 -r INSTALL_EXTENSIONS
-echo
-if [[ ! $INSTALL_EXTENSIONS =~ ^[Nn]$ ]]; then
-    install_vscode_extensions
-fi
-
 # Ensure tmux config directory exists
 mkdir -p "$TMUX_DIR/plugins"
 mkdir -p "$TMUX_DIR/resurrect"
