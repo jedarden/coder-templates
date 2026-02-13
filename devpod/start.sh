@@ -373,7 +373,7 @@ fi
 # Create the tmux session with our config and start claude code
 echo "Creating tmux session: $SESSION_NAME"
 tmux -f "$TMUX_CONF" new-session -d -s "$SESSION_NAME" -c "$SCRIPT_DIR"
-tmux send-keys -t "$SESSION_NAME" "claude --dangerously-skip-permissions" Enter
+tmux send-keys -t "$SESSION_NAME" "unset CLAUDECODE && exec claude --dangerously-skip-permissions" Enter
 
 # Attach to the session
 echo "Attaching to session: $SESSION_NAME"
