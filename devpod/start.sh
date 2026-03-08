@@ -233,8 +233,8 @@ install_claude_code() {
 get_installed_claude_version() {
     local claude_bin=""
     # Prefer native installer location
-    if [[ -x "$HOME/.claude/local/bin/claude" ]]; then
-        claude_bin="$HOME/.claude/local/bin/claude"
+    if [[ -x "$HOME/.local/bin/claude" ]]; then
+        claude_bin="$HOME/.local/bin/claude"
     elif command -v claude &>/dev/null; then
         claude_bin="$(command -v claude)"
     fi
@@ -294,7 +294,7 @@ remove_npm_claude() {
 check_and_update_claude() {
     local installed_version latest_version native_claude_path
 
-    native_claude_path="$HOME/.claude/local/bin/claude"
+    native_claude_path="$HOME/.local/bin/claude"
 
     # Check if there's an npm-installed version that should be migrated
     if command -v claude &>/dev/null; then
@@ -311,7 +311,7 @@ check_and_update_claude() {
 
     # Ensure PATH includes native install location (prepend to take priority)
     if [[ -x "$native_claude_path" ]]; then
-        export PATH="$HOME/.claude/local/bin:$PATH"
+        export PATH="$HOME/.local/bin:$PATH"
     fi
 
     installed_version=$(get_installed_claude_version)
@@ -329,7 +329,7 @@ check_and_update_claude() {
         fi
         # Add native install to PATH
         if [[ -x "$native_claude_path" ]]; then
-            export PATH="$HOME/.claude/local/bin:$PATH"
+            export PATH="$HOME/.local/bin:$PATH"
         fi
         if ! command -v claude &>/dev/null; then
             echo "Error: Claude Code installation failed."
@@ -344,7 +344,7 @@ check_and_update_claude() {
         install_claude_code
         # Ensure we use the native version after update
         if [[ -x "$native_claude_path" ]]; then
-            export PATH="$HOME/.claude/local/bin:$PATH"
+            export PATH="$HOME/.local/bin:$PATH"
         fi
         local new_version
         new_version=$(get_installed_claude_version)
@@ -435,4 +435,5 @@ tmux send-keys -t "$SESSION_NAME" "unset CLAUDECODE && exec claude --dangerously
 # Attach to the session
 echo "Attaching to session: $SESSION_NAME"
 tmux -f "$TMUX_CONF" attach-session -t "$SESSION_NAME"
+
 
