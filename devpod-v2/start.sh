@@ -194,16 +194,25 @@ if ! command -v kubectl &>/dev/null; then
     fi
 fi
 
-# Install or update Claude Code using native installer
+# Install or update Claude Code using native installer (no Node.js required)
 install_claude_code() {
     echo "Installing/updating Claude Code via native installer..."
     curl -fsSL https://claude.ai/install.sh | bash
 }
 
 # Get installed Claude Code version (returns empty string if not installed)
+# Prefers native install location over npm global install
 get_installed_claude_version() {
-    if command -v claude &>/dev/null; then
-        claude --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1
+    local claude_bin=""
+    # Prefer native installer location
+    if [[ -x "$HOME/.claude/local/bin/claude" ]]; then
+        claude_bin="$HOME/.claude/local/bin/claude"
+    elif command -v claude &>/dev/null; then
+        claude_bin="$(command -v claude)"
+    fi
+
+    if [[ -n "$claude_bin" ]]; then
+        "$claude_bin" --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1
     fi
 }
 
@@ -224,12 +233,56 @@ version_lt() {
     [[ "$v1" == "$lowest" ]]
 }
 
+# Remove npm-installed Claude Code if present (conflicts with native installer)
+remove_npm_claude() {
+    # Check for npm global install in common locations
+    local npm_claude_paths=(
+        "/usr/bin/claude"
+        "/usr/local/bin/claude"
+        "$(npm root -g 2>/dev/null)/@anthropic-ai/claude-code"
+    )
+
+    for path in "${npm_claude_paths[@]}"; do
+        if [[ -e "$path" ]]; then
+            echo "Found npm-installed Claude Code at $path, removing..."
+            if [[ "$path" == *"node_modules"* ]]; then
+                sudo npm uninstall -g @anthropic-ai/claude-code 2>/dev/null || true
+            else
+                # Check if it's a symlink to node_modules (npm install)
+                if [[ -L "$path" ]] && [[ "$(readlink -f "$path")" == *"node_modules"* ]]; then
+                    sudo npm uninstall -g @anthropic-ai/claude-code 2>/dev/null || true
+                elif [[ -f "$path" ]]; then
+                    # Direct binary, check if it's npm-installed by looking for node shebang
+                    if head -1 "$path" 2>/dev/null | grep -q "node"; then
+                        sudo npm uninstall -g @anthropic-ai/claude-code 2>/dev/null || true
+                    fi
+                fi
+            fi
+        fi
+    done
+}
+
 # Check if Claude Code needs installation or update
 check_and_update_claude() {
-    local installed_version latest_version
+    local installed_version latest_version native_claude_path
 
-    # Ensure PATH includes common install location
-    if [[ -x "$HOME/.claude/local/bin/claude" ]]; then
+    native_claude_path="$HOME/.claude/local/bin/claude"
+
+    # Check if there's an npm-installed version that should be migrated
+    if command -v claude &>/dev/null; then
+        local current_claude_path
+        current_claude_path="$(command -v claude)"
+
+        # If claude is NOT from native installer location, migrate to native
+        if [[ "$current_claude_path" != "$native_claude_path" ]] && [[ ! -x "$native_claude_path" ]]; then
+            echo "Detected non-native Claude Code installation at $current_claude_path"
+            echo "Migrating to native installer for better update support..."
+            remove_npm_claude
+        fi
+    fi
+
+    # Ensure PATH includes native install location (prepend to take priority)
+    if [[ -x "$native_claude_path" ]]; then
         export PATH="$HOME/.claude/local/bin:$PATH"
     fi
 
@@ -246,8 +299,8 @@ check_and_update_claude() {
         if [[ -f "$HOME/.zshrc" ]]; then
             source "$HOME/.zshrc" 2>/dev/null || true
         fi
-        # Check common install locations
-        if [[ -x "$HOME/.claude/local/bin/claude" ]]; then
+        # Add native install to PATH
+        if [[ -x "$native_claude_path" ]]; then
             export PATH="$HOME/.claude/local/bin:$PATH"
         fi
         if ! command -v claude &>/dev/null; then
@@ -261,6 +314,10 @@ check_and_update_claude() {
     elif version_lt "$installed_version" "$latest_version"; then
         echo "Claude Code update available: $installed_version -> $latest_version"
         install_claude_code
+        # Ensure we use the native version after update
+        if [[ -x "$native_claude_path" ]]; then
+            export PATH="$HOME/.claude/local/bin:$PATH"
+        fi
         local new_version
         new_version=$(get_installed_claude_version)
         echo "Claude Code updated: $installed_version -> $new_version"

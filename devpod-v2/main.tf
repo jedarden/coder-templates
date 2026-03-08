@@ -248,10 +248,15 @@ resource "coder_agent" "main" {
       sudo apt-get install -y -qq nodejs
     fi
 
-    # Claude Code
-    if ! command_exists claude; then
-      echo "Installing Claude Code..."
-      sudo npm install -g @anthropic-ai/claude-code >/dev/null 2>&1
+    # Claude Code (using native installer for better update support)
+    if ! command_exists claude && [ ! -x "$HOME/.claude/local/bin/claude" ]; then
+      echo "Installing Claude Code via native installer..."
+      curl -fsSL https://claude.ai/install.sh | bash
+      # Add to PATH for current session
+      export PATH="$HOME/.claude/local/bin:$PATH"
+    elif [ -x "$HOME/.claude/local/bin/claude" ]; then
+      # Ensure native install is in PATH
+      export PATH="$HOME/.claude/local/bin:$PATH"
     fi
 
     # tmux
