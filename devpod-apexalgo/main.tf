@@ -151,8 +151,9 @@ data "coder_parameter" "unlimited_resources" {
 
 locals {
   # APEXALGO-IAD SPECIFIC VALUES
-  namespace     = "devpod-apexalgo"
-  storage_class = "local-path"  # Uses local-path for ephemeral storage
+  # See: cluster-configuration/apexalgo-iad/CLAUDE.md for cluster norms
+  namespace     = "devpod"
+  storage_class = "sata"  # Cinder CSI for persistent storage (sata-large for >= 75GB)
 
   workspace_image = "ronaldraygun/coder-workspace:latest"
 
@@ -423,6 +424,20 @@ resource "kubernetes_deployment_v1" "main" {
           empty_dir {
             medium = "Memory"
           }
+        }
+
+        # Schedule on dedicated devpod node
+        # See: cluster-configuration/apexalgo-iad/devpod/NODE-SETUP.md
+        node_selector = {
+          app = "devpod"
+        }
+
+        # Tolerate the devpod node taint
+        toleration {
+          key      = "workload"
+          operator = "Equal"
+          value    = "devpod"
+          effect   = "NoSchedule"
         }
       }
     }
