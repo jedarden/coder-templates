@@ -88,15 +88,15 @@ data "coder_parameter" "memory" {
 data "coder_parameter" "disk_size" {
   name         = "disk_size"
   display_name = "Home Disk (GB)"
-  description  = "Persistent storage for home directory (sata-large: min 75GB)"
+  description  = "Persistent storage for home directory (ssd-large: >= 50GB)"
   icon         = "/emojis/1f4be.png"
   type         = "number"
-  default      = "75"
+  default      = "50"
   mutable      = false
   order        = 3
 
   validation {
-    min = 75
+    min = 50
     max = 500
   }
 }
@@ -153,7 +153,7 @@ locals {
   # APEXALGO-IAD SPECIFIC VALUES
   # See: cluster-configuration/apexalgo-iad/CLAUDE.md for cluster norms
   namespace     = "devpod"
-  storage_class = "sata-large"  # Cinder CSI, >= 75GB, $0.02/GB-mo
+  storage_class = "ssd-large"  # Cinder CSI, >= 50GB, $0.06/GB-mo (NVMe performance)
 
   workspace_image = "ronaldraygun/coder-workspace:latest"
 

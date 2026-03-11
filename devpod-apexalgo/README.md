@@ -7,7 +7,7 @@ Kubernetes-based development workspace template for Coder, designed for the apex
 | Setting | Value |
 |---------|-------|
 | Namespace | `devpod` |
-| Storage Class | `sata` (Cinder CSI, 5-20GB) or `sata-large` (≥75GB) |
+| Storage Class | `ssd-large` (Cinder CSI, >= 50GB) |
 | Node Selector | `app: devpod` |
 | Toleration | `workload=devpod:NoSchedule` |
 
@@ -44,7 +44,7 @@ Kubernetes-based development workspace template for Coder, designed for the apex
 |-----------|-------------|---------|
 | CPU | Number of CPU cores | 0 (Best Effort) |
 | Memory | RAM in GB | 0 (Best Effort) |
-| Disk Size | Persistent storage | 40 GB |
+| Disk Size | Persistent storage | 50 GB |
 | Git Repository | Git repo to clone | (empty) |
 | Dotfiles | Personal dotfiles repo | (empty) |
 | AI Extensions | Install AI VS Code extensions | true |
